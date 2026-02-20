@@ -1,0 +1,29 @@
+# uv
+.venv/
+uv.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+*.env.local
+
+# Experience memory (generated at runtime)
+experience_memory.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Datadog
+.ddtrace/
