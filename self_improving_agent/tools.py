@@ -118,6 +118,30 @@ def get_improvement_stats() -> dict:
     }
 
 
+def get_experience_timeline() -> list[dict]:
+    """Get experience data formatted for charting.
+
+    Returns a list of entries with timestamp, score, category, and
+    cumulative average — suitable for Streamlit dashboard charts.
+
+    Returns:
+        List of timeline entries with running averages.
+    """
+    _load_memory()
+    timeline = []
+    running_sum = 0.0
+    for i, e in enumerate(_EXPERIENCE_MEMORY, 1):
+        running_sum += e["score"]
+        timeline.append({
+            "index": i,
+            "timestamp": e["timestamp"],
+            "category": e["category"],
+            "score": e["score"],
+            "cumulative_avg": round(running_sum / i, 3),
+        })
+    return timeline
+
+
 def clear_experience_memory() -> dict:
     """Reset all stored experiences. Use for demo resets.
 

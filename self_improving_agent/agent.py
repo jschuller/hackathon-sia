@@ -23,6 +23,9 @@ from .tools import (
     clear_experience_memory,
 )
 
+# ── Check if ElevenLabs is available for narrator ────────────
+_ELEVENLABS_AVAILABLE = bool(os.environ.get("ELEVENLABS_API_KEY"))
+
 # ── Configuration ────────────────────────────────────────────
 MODEL = os.environ.get("ADK_MODEL", "gemini-2.5-flash")
 
@@ -65,6 +68,16 @@ def exit_loop(tool_context) -> dict:
     """
     tool_context.actions.escalate = True
     return {"status": "quality_achieved", "action": "exiting_improvement_loop"}
+
+
+# ── State key tool for critic to signal quality achieved ─────
+def mark_quality_achieved(tool_context) -> dict:
+    """Mark the resolution as quality-achieved in session state.
+    Call this when overall score >= 0.85. The refiner will check this
+    state key and call exit_loop if set.
+    """
+    tool_context.state["quality_achieved"] = True
+    return {"status": "marked", "quality_achieved": True}
 
 
 # ── Load MCP tools once ──────────────────────────────────────
@@ -149,17 +162,18 @@ Score on these 5 dimensions (each 0.0 to 1.0):
 Calculate overall score = average of all 5 dimensions.
 
 If overall score >= 0.85:
-- Say "QUALITY_ACHIEVED" clearly in your response
+- Call mark_quality_achieved to signal the loop should end
 - Call store_experience with the category, a summary of the resolution, and the score
 - Call get_improvement_stats to show the learning trajectory
+- Say "QUALITY_ACHIEVED" in your response
 
 If overall score < 0.85:
 - Provide specific, actionable feedback for EACH low-scoring dimension
 - Explain exactly what would raise the score
-- Do NOT say "QUALITY_ACHIEVED"
+- Do NOT call mark_quality_achieved
 
 Output your evaluation with all dimension scores and the overall score.""",
-    tools=[store_experience, get_improvement_stats],
+    tools=[store_experience, get_improvement_stats, mark_quality_achieved],
     output_key="evaluation_result",
 )
 
@@ -174,13 +188,16 @@ refiner_agent = LlmAgent(
     instruction="""You are a resolution refinement specialist. You take critic
 feedback and improve the resolution.
 
-Read the evaluation result (session state key 'evaluation_result'):
+Read the evaluation result (session state key 'evaluation_result').
+Check session state key 'quality_achieved' — if it is True, the critic has
+already approved the resolution.
 
-If the evaluation says "QUALITY_ACHIEVED":
+If quality_achieved is True:
 - Call the exit_loop tool immediately to end the improvement cycle
 - The resolution is ready to deliver
 
-If the evaluation identifies weaknesses:
+If quality_achieved is NOT True (or not set):
+- The resolution needs improvement
 - Address EACH specific piece of feedback from the critic
 - Add missing details, commands, rollback steps, or safety measures
 - Check retrieve_experiences for additional proven patterns
@@ -209,18 +226,62 @@ improvement_loop = LoopAgent(
 
 
 # ══════════════════════════════════════════════════════════════
+# AGENT 5: NARRATOR — reads resolution aloud (ElevenLabs TTS)
+# ══════════════════════════════════════════════════════════════
+_narrator_tools = []
+if _ELEVENLABS_AVAILABLE:
+    try:
+        from .mcp_servers import elevenlabs_mcp
+        _narrator_tools.append(elevenlabs_mcp())
+        print("  ✓ ElevenLabs MCP loaded for narrator")
+    except Exception as e:
+        print(f"  ⚠ Narrator ElevenLabs skipped: {e}")
+
+narrator_agent = LlmAgent(
+    model=MODEL,
+    name="narrator_agent",
+    description="Narrates the final incident resolution using text-to-speech.",
+    instruction="""You are an incident resolution narrator. Your job is to deliver
+a clear, professional audio summary of the completed resolution.
+
+Read the final resolution from session state key 'resolution_proposal' and
+the triage report from session state key 'triage_report'.
+
+Compose a concise narration (2-3 sentences) summarizing:
+1. What the incident was (category, severity)
+2. What was done to resolve it
+3. The quality score achieved
+
+Then call the ElevenLabs text-to-speech tool to speak this narration aloud.
+Use a professional, calm voice. If no TTS tools are available, just output
+the narration text.
+
+Keep the narration under 30 seconds of speech.""",
+    tools=_narrator_tools,
+    output_key="narration",
+)
+
+
+# ══════════════════════════════════════════════════════════════
 # ROOT AGENT — Full Pipeline (this is what ADK loads)
 # ══════════════════════════════════════════════════════════════
+_pipeline = [
+    triage_agent,
+    resolution_agent,
+    improvement_loop,
+]
+
+# Add narrator only when ElevenLabs is configured
+if _ELEVENLABS_AVAILABLE:
+    _pipeline.append(narrator_agent)
+    print("  ✓ Narrator agent added to pipeline")
+
 root_agent = SequentialAgent(
     name="self_healing_incident_agent",
     description=(
         "Self-improving IT incident resolution agent. "
-        "Triages → Resolves → Self-critiques → Refines → Learns. "
+        "Triages → Resolves → Self-critiques → Refines → Learns → Narrates. "
         "Gets measurably better with every interaction."
     ),
-    sub_agents=[
-        triage_agent,
-        resolution_agent,
-        improvement_loop,
-    ],
+    sub_agents=_pipeline,
 )
