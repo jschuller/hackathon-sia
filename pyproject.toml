@@ -12,6 +12,7 @@ dependencies = [
     "braintrust>=0.5.0",
     "autoevals>=0.1.0",
     "streamlit>=1.35.0",
+    "mcp-servicenow @ git+https://github.com/jschuller/mcp-server-servicenow.git",
 ]
 
 [project.optional-dependencies]

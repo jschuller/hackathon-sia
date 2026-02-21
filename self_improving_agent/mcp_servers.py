@@ -44,19 +44,19 @@ def elevenlabs_mcp() -> McpToolset:
 
 
 def servicenow_mcp() -> McpToolset:
-    """ServiceNow MCP (shunyaai/snow-mcp or custom)."""
+    """ServiceNow MCP — jschuller/mcp-server-servicenow (18 tools)."""
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command=_find_bin("uvx"),
-                args=["--from", "servicenow-mcp-enhanced", "servicenow-mcp"],
+                command=_find_bin("mcp-servicenow"),
+                args=[],
                 env={
                     "SERVICENOW_INSTANCE_URL": os.environ.get(
                         "SERVICENOW_INSTANCE_URL", ""
                     ),
                     "SERVICENOW_USERNAME": os.environ.get("SERVICENOW_USERNAME", ""),
                     "SERVICENOW_PASSWORD": os.environ.get("SERVICENOW_PASSWORD", ""),
-                    "SERVICENOW_AUTH_TYPE": "basic",
+                    "SERVICENOW_AUTH_TYPE": os.environ.get("SERVICENOW_AUTH_TYPE", "basic"),
                 },
             ),
             timeout=30,
