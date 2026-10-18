@@ -61,23 +61,16 @@ def _load_mcp_tools() -> list:
     return tools
 
 
-# ── Exit tool for the LoopAgent ──────────────────────────────
+# ── Exit tool for the LoopAgent (called by the critic) ───────
+# The critic, not the refiner, ends the loop: ADK runs one more model turn
+# after a tool call and saves that text under the agent's output_key, so a
+# refiner that exits would overwrite the approved 'resolution_proposal'.
 def exit_loop(tool_context) -> dict:
     """Signal that the resolution meets quality standards.
     Call this ONLY when the critic scores the resolution >= 0.85.
     """
     tool_context.actions.escalate = True
     return {"status": "quality_achieved", "action": "exiting_improvement_loop"}
-
-
-# ── State key tool for critic to signal quality achieved ─────
-def mark_quality_achieved(tool_context) -> dict:
-    """Mark the resolution as quality-achieved in session state.
-    Call this when overall score >= 0.85. The refiner will check this
-    state key and call exit_loop if set.
-    """
-    tool_context.state["quality_achieved"] = True
-    return {"status": "marked", "quality_achieved": True}
 
 
 # ── Load MCP tools once ──────────────────────────────────────
@@ -162,18 +155,18 @@ Score on these 5 dimensions (each 0.0 to 1.0):
 Calculate overall score = average of all 5 dimensions.
 
 If overall score >= 0.85:
-- Call mark_quality_achieved to signal the loop should end
 - Call store_experience with the category, a summary of the resolution, and the score
 - Call get_improvement_stats to show the learning trajectory
+- Call exit_loop last to end the improvement loop
 - Say "QUALITY_ACHIEVED" in your response
 
 If overall score < 0.85:
 - Provide specific, actionable feedback for EACH low-scoring dimension
 - Explain exactly what would raise the score
-- Do NOT call mark_quality_achieved
+- Do NOT call exit_loop
 
 Output your evaluation with all dimension scores and the overall score.""",
-    tools=[store_experience, get_improvement_stats, mark_quality_achieved],
+    tools=[store_experience, get_improvement_stats, exit_loop],
     output_key="evaluation_result",
 )
 
@@ -189,15 +182,8 @@ refiner_agent = LlmAgent(
 feedback and improve the resolution.
 
 Read the evaluation result (session state key 'evaluation_result').
-Check session state key 'quality_achieved' — if it is True, the critic has
-already approved the resolution.
-
-If quality_achieved is True:
-- Call the exit_loop tool immediately to end the improvement cycle
-- The resolution is ready to deliver
-
-If quality_achieved is NOT True (or not set):
-- The resolution needs improvement
+You only run when the critic did not approve the resolution, so it needs
+improvement:
 - Address EACH specific piece of feedback from the critic
 - Add missing details, commands, rollback steps, or safety measures
 - Check retrieve_experiences for additional proven patterns
@@ -205,7 +191,7 @@ If quality_achieved is NOT True (or not set):
 
 Each iteration MUST show measurable improvement over the previous version.
 Never repeat the same resolution without substantive changes.""",
-    tools=[exit_loop, retrieve_experiences],
+    tools=[retrieve_experiences],
     output_key="resolution_proposal",
 )
 
