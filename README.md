@@ -54,8 +54,8 @@ uv run adk web self_improving_agent        # start
 | ServiceNow | Incident/CMDB data | MCP (STDIO via uvx, pinned) |
 | ElevenLabs | Voice narration | MCP (STDIO via uvx, pinned) |
 | Datadog | LLM Observability | ddtrace auto-instrument |
-| Braintrust | Eval scoring | Python SDK + MCP |
-| Postman | API management | MCP (remote SSE) |
+| Braintrust | Eval scoring | Python SDK (`eval/braintrust_eval.py`) |
+| Perplexity | Web search for triage and resolution | MCP (STDIO via npx, pinned) |
 
 ## Known limitations
 

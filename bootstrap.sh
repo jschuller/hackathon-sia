@@ -19,7 +19,7 @@ else
     echo "✓ uv $(uv --version) already installed"
 fi
 
-# ── 2. Install Node.js (if missing — needed for npx/Postman MCP) ─
+# ── 2. Install Node.js (if missing — needed for npx/Perplexity MCP) ─
 if ! command -v node &>/dev/null; then
     echo "→ Installing Node.js via NodeSource..."
     curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -

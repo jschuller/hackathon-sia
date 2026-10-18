@@ -112,26 +112,7 @@ def perplexity_mcp() -> McpToolset:
 
 
 # ── SSE / Streamable HTTP servers (remote — zero install) ────
-
-def postman_mcp_remote(mode: str = "minimal") -> McpToolset:
-    """Postman MCP (remote — zero local setup).
-    mode: 'minimal', 'mcp' (full), or 'code'
-    """
-    url_map = {
-        "minimal": "https://mcp.postman.com/minimal",
-        "mcp": "https://mcp.postman.com/mcp",
-        "full": "https://mcp.postman.com/mcp",
-        "code": "https://mcp.postman.com/code",
-    }
-    return McpToolset(
-        connection_params=SseConnectionParams(
-            url=url_map.get(mode, url_map["minimal"]),
-            headers={
-                "Authorization": f"Bearer {os.environ.get('POSTMAN_API_KEY', '')}",
-            },
-        ),
-    )
-
+# Defined for experiments; agent.py attaches neither.
 
 def braintrust_mcp() -> McpToolset:
     """Braintrust MCP — query eval experiments and scores."""
