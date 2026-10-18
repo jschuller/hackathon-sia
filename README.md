@@ -51,11 +51,11 @@ uv run adk web self_improving_agent        # start
 
 | Sponsor | Role | Integration |
 |---------|------|-------------|
-| ServiceNow | Incident/CMDB data | MCP (STDIO via uvx) |
-| ElevenLabs | Voice narration | MCP (STDIO via uvx) |
+| ServiceNow | Incident/CMDB data | MCP (STDIO via uvx, pinned) |
+| ElevenLabs | Voice narration | MCP (STDIO via uvx, pinned) |
 | Datadog | LLM Observability | ddtrace auto-instrument |
 | Braintrust | Eval scoring | Python SDK + MCP |
-| Postman | API management | MCP (remote SSE + local npx) |
+| Postman | API management | MCP (remote SSE) |
 
 ## Known limitations
 

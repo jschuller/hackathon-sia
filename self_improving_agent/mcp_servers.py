@@ -15,6 +15,16 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 )
 from mcp import StdioServerParameters
 
+# ── Pinned server versions ───────────────────────────────────
+# uvx/npx fetch these at launch, so an unpinned name runs whatever was
+# published last. Bump deliberately.
+ELEVENLABS_MCP = "elevenlabs-mcp==0.12.2"
+SERVICENOW_MCP_SOURCE = (  # v0.9.1
+    "git+https://github.com/jschuller/mcp-server-servicenow.git"
+    "@912a6e712113580586a762858f6926585cbeb6ed"
+)
+PERPLEXITY_MCP = "@jschuller/perplexity-mcp@2.1.1"
+
 # ── Tool allowlists ─────────────────────────────────────────
 # Incident text, CMDB data and web results are untrusted, so the agents that
 # read them only get read tools. Write tools stay hidden even if a prompt
@@ -48,7 +58,7 @@ def elevenlabs_mcp() -> McpToolset:
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
                 command=_find_bin("uvx"),
-                args=["elevenlabs-mcp"],
+                args=[ELEVENLABS_MCP],
                 env={
                     "ELEVENLABS_API_KEY": os.environ.get("ELEVENLABS_API_KEY", ""),
                     "ELEVENLABS_MCP_OUTPUT_MODE": "both",
@@ -65,8 +75,8 @@ def servicenow_mcp() -> McpToolset:
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command=_find_bin("mcp-servicenow"),
-                args=[],
+                command=_find_bin("uvx"),
+                args=["--from", SERVICENOW_MCP_SOURCE, "mcp-server-servicenow"],
                 env={
                     "SERVICENOW_INSTANCE_URL": os.environ.get(
                         "SERVICENOW_INSTANCE_URL", ""
@@ -84,29 +94,13 @@ def servicenow_mcp() -> McpToolset:
     )
 
 
-def postman_mcp_local() -> McpToolset:
-    """Postman MCP (local STDIO — full 100+ tools)."""
+def perplexity_mcp() -> McpToolset:
+    """Perplexity MCP — web search (jschuller/perplexity-mcp)."""
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
                 command=_find_bin("npx"),
-                args=["-y", "@postman/postman-mcp-server", "--full"],
-                env={
-                    "POSTMAN_API_KEY": os.environ.get("POSTMAN_API_KEY", ""),
-                },
-            ),
-            timeout=30,
-        ),
-    )
-
-
-def perplexity_mcp() -> McpToolset:
-    """Perplexity MCP — web search."""
-    return McpToolset(
-        connection_params=StdioConnectionParams(
-            server_params=StdioServerParameters(
-                command=_find_bin("uvx"),
-                args=["perplexity-mcp"],
+                args=["-y", PERPLEXITY_MCP],
                 env={
                     "PERPLEXITY_API_KEY": os.environ.get("PERPLEXITY_API_KEY", ""),
                 },
