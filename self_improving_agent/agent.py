@@ -8,13 +8,18 @@ With DD: uv run ddtrace-run adk web self_improving_agent
 """
 
 import os
+import re
+from collections.abc import AsyncGenerator
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from google.adk.agents import LlmAgent
+from google.adk.agents import BaseAgent, LlmAgent
+from google.adk.agents.invocation_context import InvocationContext
 from google.adk.agents.loop_agent import LoopAgent
 from google.adk.agents.sequential_agent import SequentialAgent
+from google.adk.events import Event, EventActions
 
 from .tools import (
     store_experience,
@@ -28,6 +33,7 @@ _ELEVENLABS_AVAILABLE = bool(os.environ.get("ELEVENLABS_API_KEY"))
 
 # ── Configuration ────────────────────────────────────────────
 MODEL = os.environ.get("ADK_MODEL", "gemini-2.5-flash")
+QUALITY_THRESHOLD = 0.85
 
 
 # ── MCP Toolsets (loaded conditionally based on .env) ────────
@@ -68,6 +74,41 @@ def exit_loop(tool_context) -> dict:
     """
     tool_context.actions.escalate = True
     return {"status": "quality_achieved", "action": "exiting_improvement_loop"}
+
+
+# ── Deterministic backstop for the loop exit ─────────────────
+_OVERALL_SCORE = re.compile(r"overall(?:\s+score)?\W*([01](?:\.\d+)?)", re.IGNORECASE)
+
+
+def critic_approved(evaluation: str) -> bool:
+    """Whether the critic's evaluation text approves the resolution.
+
+    The last "overall score" in the text decides when there is one; otherwise
+    the QUALITY_ACHIEVED marker does.
+    """
+    scores = _OVERALL_SCORE.findall(evaluation)
+    if scores:
+        return float(scores[-1]) >= QUALITY_THRESHOLD
+    return "QUALITY_ACHIEVED" in evaluation
+
+
+class ApprovalGate(BaseAgent):
+    """Ends the loop when the critic approved in text but did not call exit_loop.
+
+    Runs between the critic and the refiner, so an approved resolution is never
+    handed to the refiner just because the model skipped the tool call.
+    """
+
+    async def _run_async_impl(
+        self, ctx: InvocationContext
+    ) -> AsyncGenerator[Event, None]:
+        if critic_approved(str(ctx.session.state.get("evaluation_result", ""))):
+            yield Event(
+                invocation_id=ctx.invocation_id,
+                author=self.name,
+                branch=ctx.branch,
+                actions=EventActions(escalate=True),
+            )
 
 
 # ── Load MCP tools once ──────────────────────────────────────
@@ -203,7 +244,14 @@ improvement_loop = LoopAgent(
         "refinement. Runs critic → refiner in a loop until quality >= 0.85 "
         "or max iterations reached."
     ),
-    sub_agents=[critic_agent, refiner_agent],
+    sub_agents=[
+        critic_agent,
+        ApprovalGate(
+            name="approval_gate",
+            description="Ends the loop when the critic's evaluation approves.",
+        ),
+        refiner_agent,
+    ],
     max_iterations=5,
 )
 

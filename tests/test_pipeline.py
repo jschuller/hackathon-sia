@@ -91,6 +91,46 @@ def test_refined_resolution_is_kept_once_approved(models: dict[str, ScriptedLlm]
     assert models["critic_agent"].calls == 4
 
 
+def test_text_only_approval_still_ends_the_loop(models: dict[str, ScriptedLlm]) -> None:
+    # The critic approves in text but never calls exit_loop.
+    models["critic_agent"].script = [text("Overall score: 0.90. QUALITY_ACHIEVED")]
+    models["refiner_agent"].script = [text("UNREVIEWED DRAFT")] * 5
+
+    state = asyncio.run(_run("CPU at 98% on web-prod-03"))
+
+    assert state["resolution_proposal"] == "APPROVED PLAN: roll back v2.4.1"
+    assert models["refiner_agent"].calls == 0  # gate stops the loop before it
+
+
+def test_text_only_approval_after_a_refinement(models: dict[str, ScriptedLlm]) -> None:
+    models["critic_agent"].script = [
+        text("**Overall score**: 0.60. Add rollback steps."),
+        text("Overall: 0.88 QUALITY_ACHIEVED"),
+    ]
+    models["refiner_agent"].script = [text("REFINED PLAN: roll back v2.4.1, then verify")]
+
+    state = asyncio.run(_run("CPU at 98% on web-prod-03"))
+
+    assert state["resolution_proposal"] == "REFINED PLAN: roll back v2.4.1, then verify"
+    assert models["refiner_agent"].calls == 1
+
+
+@pytest.mark.parametrize(
+    ("evaluation", "approved"),
+    [
+        ("Overall score: 0.90. QUALITY_ACHIEVED", True),
+        ("**Overall score** = 0.85", True),
+        ("Overall: 0.84. Needs rollback steps.", False),
+        ("Overall score 0.60 -- not QUALITY_ACHIEVED yet", False),
+        ("Completeness 0.9 ... Overall score: 0.70 ... revised overall score: 0.91", True),
+        ("QUALITY_ACHIEVED", True),
+        ("Needs more detail.", False),
+    ],
+)
+def test_critic_approved(evaluation: str, approved: bool) -> None:
+    assert sia.critic_approved(evaluation) is approved
+
+
 def test_refiner_cannot_exit_the_loop() -> None:
     refiner_tools = {getattr(t, "__name__", None) for t in sia.refiner_agent.tools}
     critic_tools = {getattr(t, "__name__", None) for t in sia.critic_agent.tools}
