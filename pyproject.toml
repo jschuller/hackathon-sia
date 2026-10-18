@@ -21,6 +21,11 @@ dev = ["ruff", "pytest"]
 [dependency-groups]
 dev = ["ruff", "pytest"]
 
+[tool.uv]
+# Resolve only releases uploaded before this date (a two-week cooldown when set);
+# fixed in the project so `uv lock --no-config` reproduces uv.lock anywhere.
+exclude-newer = "2026-10-04T00:00:00Z"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
