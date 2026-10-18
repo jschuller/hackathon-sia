@@ -15,6 +15,22 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 )
 from mcp import StdioServerParameters
 
+# ── Tool allowlists ─────────────────────────────────────────
+# Incident text, CMDB data and web results are untrusted, so the agents that
+# read them only get read tools. Write tools stay hidden even if a prompt
+# injection asks for them.
+SERVICENOW_READ_TOOLS = [
+    "list_records",
+    "get_record",
+    "aggregate_records",
+    "list_ci",
+    "get_ci",
+    "get_ci_relationships",
+    "get_table_schema",
+]
+PERPLEXITY_TOOLS = ["perplexity_search_web"]
+ELEVENLABS_TOOLS = ["text_to_speech"]
+
 
 def _find_bin(name: str) -> str:
     """Find a binary on PATH, raising if missing."""
@@ -27,7 +43,7 @@ def _find_bin(name: str) -> str:
 # ── STDIO servers (local processes via uvx/npx) ─────────────
 
 def elevenlabs_mcp() -> McpToolset:
-    """ElevenLabs MCP — TTS, STT, voice cloning."""
+    """ElevenLabs MCP — text-to-speech only."""
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
@@ -40,11 +56,12 @@ def elevenlabs_mcp() -> McpToolset:
             ),
             timeout=30,
         ),
+        tool_filter=ELEVENLABS_TOOLS,
     )
 
 
 def servicenow_mcp() -> McpToolset:
-    """ServiceNow MCP — jschuller/mcp-server-servicenow (18 tools)."""
+    """ServiceNow MCP — jschuller/mcp-server-servicenow, read-only."""
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
@@ -57,10 +74,13 @@ def servicenow_mcp() -> McpToolset:
                     "SERVICENOW_USERNAME": os.environ.get("SERVICENOW_USERNAME", ""),
                     "SERVICENOW_PASSWORD": os.environ.get("SERVICENOW_PASSWORD", ""),
                     "SERVICENOW_AUTH_TYPE": os.environ.get("SERVICENOW_AUTH_TYPE", "basic"),
+                    # Hides the write tools and refuses non-GET requests
+                    "SERVICENOW_READ_ONLY": "true",
                 },
             ),
             timeout=30,
         ),
+        tool_filter=SERVICENOW_READ_TOOLS,
     )
 
 
@@ -93,6 +113,7 @@ def perplexity_mcp() -> McpToolset:
             ),
             timeout=30,
         ),
+        tool_filter=PERPLEXITY_TOOLS,
     )
 
 

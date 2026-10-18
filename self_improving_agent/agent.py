@@ -32,7 +32,12 @@ MODEL = os.environ.get("ADK_MODEL", "gemini-2.5-flash")
 
 # ── MCP Toolsets (loaded conditionally based on .env) ────────
 def _load_mcp_tools() -> list:
-    """Return MCP toolsets for keys that are present in .env."""
+    """Return read-only MCP toolsets for keys that are present in .env.
+
+    Triage and resolution read untrusted incident and web content, so they get
+    ServiceNow read tools and Perplexity search only. ElevenLabs goes to the
+    narrator alone.
+    """
     tools = []
     try:
         from .mcp_servers import servicenow_mcp
@@ -41,14 +46,6 @@ def _load_mcp_tools() -> list:
             print("  ✓ ServiceNow MCP loaded")
     except Exception as e:
         print(f"  ⚠ ServiceNow MCP skipped: {e}")
-
-    try:
-        from .mcp_servers import elevenlabs_mcp
-        if os.environ.get("ELEVENLABS_API_KEY"):
-            tools.append(elevenlabs_mcp())
-            print("  ✓ ElevenLabs MCP loaded")
-    except Exception as e:
-        print(f"  ⚠ ElevenLabs MCP skipped: {e}")
 
     try:
         from .mcp_servers import perplexity_mcp

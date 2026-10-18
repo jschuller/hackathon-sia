@@ -57,6 +57,15 @@ uv run adk web self_improving_agent        # start
 | Braintrust | Eval scoring | Python SDK + MCP |
 | Postman | API management | MCP (remote SSE + local npx) |
 
+## Known limitations
+
+- **Read-only tools.** Incident text, CMDB records and web results are
+  untrusted input, so triage and resolution get only ServiceNow read tools
+  (`SERVICENOW_READ_ONLY=true` plus a `tool_filter`) and Perplexity search.
+  ElevenLabs is attached to the narrator alone, limited to `text_to_speech`.
+  The agent proposes resolutions; it cannot create incidents, add work notes
+  or change CIs.
+
 ## License
 
 MIT — Hackathon project
