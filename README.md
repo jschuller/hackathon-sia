@@ -65,6 +65,12 @@ uv run adk web self_improving_agent        # start
   ElevenLabs is attached to the narrator alone, limited to `text_to_speech`.
   The agent proposes resolutions; it cannot create incidents, add work notes
   or change CIs.
+- **The eval does not measure the agent.** `eval/braintrust_eval.py` calls
+  Gemini directly with a hand-written prompt; it never runs `root_agent`, the
+  critic loop or the MCP tools. Its five incidents are the same ones
+  `scripts/seed_servicenow.py` seeds, and v2 only adds stored experiences to
+  the prompt, so the v1/v2 before/after numbers are not evidence that the
+  agent improves.
 
 ## License
 
