@@ -8,13 +8,18 @@ With DD: uv run ddtrace-run adk web self_improving_agent
 """
 
 import os
+import re
+from collections.abc import AsyncGenerator
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from google.adk.agents import LlmAgent
+from google.adk.agents import BaseAgent, LlmAgent
+from google.adk.agents.invocation_context import InvocationContext
 from google.adk.agents.loop_agent import LoopAgent
 from google.adk.agents.sequential_agent import SequentialAgent
+from google.adk.events import Event, EventActions
 
 from .tools import (
     store_experience,
@@ -32,7 +37,12 @@ MODEL = os.environ.get("ADK_MODEL", "gemini-2.5-flash")
 
 # ── MCP Toolsets (loaded conditionally based on .env) ────────
 def _load_mcp_tools() -> list:
-    """Return MCP toolsets for keys that are present in .env."""
+    """Return read-only MCP toolsets for keys that are present in .env.
+
+    Triage and resolution read untrusted incident and web content, so they get
+    ServiceNow read tools and Perplexity search only. ElevenLabs goes to the
+    narrator alone.
+    """
     tools = []
     try:
         from .mcp_servers import servicenow_mcp
@@ -41,14 +51,6 @@ def _load_mcp_tools() -> list:
             print("  ✓ ServiceNow MCP loaded")
     except Exception as e:
         print(f"  ⚠ ServiceNow MCP skipped: {e}")
-
-    try:
-        from .mcp_servers import elevenlabs_mcp
-        if os.environ.get("ELEVENLABS_API_KEY"):
-            tools.append(elevenlabs_mcp())
-            print("  ✓ ElevenLabs MCP loaded")
-    except Exception as e:
-        print(f"  ⚠ ElevenLabs MCP skipped: {e}")
 
     try:
         from .mcp_servers import perplexity_mcp
@@ -61,7 +63,10 @@ def _load_mcp_tools() -> list:
     return tools
 
 
-# ── Exit tool for the LoopAgent ──────────────────────────────
+# ── Exit tool for the LoopAgent (called by the critic) ───────
+# The critic, not the refiner, ends the loop: ADK runs one more model turn
+# after a tool call and saves that text under the agent's output_key, so a
+# refiner that exits would overwrite the approved 'resolution_proposal'.
 def exit_loop(tool_context) -> dict:
     """Signal that the resolution meets quality standards.
     Call this ONLY when the critic scores the resolution >= 0.85.
@@ -70,14 +75,48 @@ def exit_loop(tool_context) -> dict:
     return {"status": "quality_achieved", "action": "exiting_improvement_loop"}
 
 
-# ── State key tool for critic to signal quality achieved ─────
-def mark_quality_achieved(tool_context) -> dict:
-    """Mark the resolution as quality-achieved in session state.
-    Call this when overall score >= 0.85. The refiner will check this
-    state key and call exit_loop if set.
+# ── Deterministic backstop for the loop exit ─────────────────
+# The critic ends its evaluation with one fixed verdict line. Free-text scores
+# are not parsed: "overall" also appears in arithmetic ("(0.90 + 0.80 ...) / 5")
+# and prose ("Overall, 1 gap remains"), which once read as approvals.
+_VERDICT = re.compile(r"^[\s*_>#-]*VERDICT[*_]*\s*:[\s*_]*(APPROVED|REVISE)[*_.\s]*$", re.IGNORECASE | re.MULTILINE)
+
+
+def critic_approved(evaluation: str) -> bool:
+    """Whether the critic's evaluation ends in a "VERDICT: APPROVED" line.
+
+    The last verdict line decides; text without one is not an approval.
     """
-    tool_context.state["quality_achieved"] = True
-    return {"status": "marked", "quality_achieved": True}
+    verdicts = _VERDICT.findall(evaluation)
+    return bool(verdicts) and verdicts[-1].upper() == "APPROVED"
+
+
+def _clear_evaluation(callback_context) -> None:
+    """Drops the previous evaluation before the critic runs.
+
+    An empty model reply leaves output_key untouched, so without this the gate
+    could act on an earlier iteration's or incident's approval.
+    """
+    callback_context.state["evaluation_result"] = ""
+
+
+class ApprovalGate(BaseAgent):
+    """Ends the loop when the critic approved in text but did not call exit_loop.
+
+    Runs between the critic and the refiner, so an approved resolution is never
+    handed to the refiner just because the model skipped the tool call.
+    """
+
+    async def _run_async_impl(
+        self, ctx: InvocationContext
+    ) -> AsyncGenerator[Event, None]:
+        if critic_approved(str(ctx.session.state.get("evaluation_result", ""))):
+            yield Event(
+                invocation_id=ctx.invocation_id,
+                author=self.name,
+                branch=ctx.branch,
+                actions=EventActions(escalate=True),
+            )
 
 
 # ── Load MCP tools once ──────────────────────────────────────
@@ -162,19 +201,22 @@ Score on these 5 dimensions (each 0.0 to 1.0):
 Calculate overall score = average of all 5 dimensions.
 
 If overall score >= 0.85:
-- Call mark_quality_achieved to signal the loop should end
 - Call store_experience with the category, a summary of the resolution, and the score
 - Call get_improvement_stats to show the learning trajectory
-- Say "QUALITY_ACHIEVED" in your response
+- Call exit_loop last to end the improvement loop
 
 If overall score < 0.85:
 - Provide specific, actionable feedback for EACH low-scoring dimension
 - Explain exactly what would raise the score
-- Do NOT call mark_quality_achieved
+- Do NOT call exit_loop
 
-Output your evaluation with all dimension scores and the overall score.""",
-    tools=[store_experience, get_improvement_stats, mark_quality_achieved],
+Output your evaluation with all dimension scores and the overall score. End with
+exactly one final line, nothing after it:
+VERDICT: APPROVED   (overall score >= 0.85)
+VERDICT: REVISE     (otherwise)""",
+    tools=[store_experience, get_improvement_stats, exit_loop],
     output_key="evaluation_result",
+    before_agent_callback=_clear_evaluation,
 )
 
 
@@ -189,15 +231,8 @@ refiner_agent = LlmAgent(
 feedback and improve the resolution.
 
 Read the evaluation result (session state key 'evaluation_result').
-Check session state key 'quality_achieved' — if it is True, the critic has
-already approved the resolution.
-
-If quality_achieved is True:
-- Call the exit_loop tool immediately to end the improvement cycle
-- The resolution is ready to deliver
-
-If quality_achieved is NOT True (or not set):
-- The resolution needs improvement
+You only run when the critic did not approve the resolution, so it needs
+improvement:
 - Address EACH specific piece of feedback from the critic
 - Add missing details, commands, rollback steps, or safety measures
 - Check retrieve_experiences for additional proven patterns
@@ -205,7 +240,7 @@ If quality_achieved is NOT True (or not set):
 
 Each iteration MUST show measurable improvement over the previous version.
 Never repeat the same resolution without substantive changes.""",
-    tools=[exit_loop, retrieve_experiences],
+    tools=[retrieve_experiences],
     output_key="resolution_proposal",
 )
 
@@ -220,7 +255,14 @@ improvement_loop = LoopAgent(
         "refinement. Runs critic → refiner in a loop until quality >= 0.85 "
         "or max iterations reached."
     ),
-    sub_agents=[critic_agent, refiner_agent],
+    sub_agents=[
+        critic_agent,
+        ApprovalGate(
+            name="approval_gate",
+            description="Ends the loop when the critic's evaluation approves.",
+        ),
+        refiner_agent,
+    ],
     max_iterations=5,
 )
 

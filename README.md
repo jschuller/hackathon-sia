@@ -51,11 +51,26 @@ uv run adk web self_improving_agent        # start
 
 | Sponsor | Role | Integration |
 |---------|------|-------------|
-| ServiceNow | Incident/CMDB data | MCP (STDIO via uvx) |
-| ElevenLabs | Voice narration | MCP (STDIO via uvx) |
+| ServiceNow | Incident/CMDB data | MCP (STDIO via uvx, pinned) |
+| ElevenLabs | Voice narration | MCP (STDIO via uvx, pinned) |
 | Datadog | LLM Observability | ddtrace auto-instrument |
-| Braintrust | Eval scoring | Python SDK + MCP |
-| Postman | API management | MCP (remote SSE + local npx) |
+| Braintrust | Eval scoring | Python SDK (`eval/braintrust_eval.py`) |
+| Perplexity | Web search for triage and resolution | MCP (STDIO via npx, pinned) |
+
+## Known limitations
+
+- **Read-only tools.** Incident text, CMDB records and web results are
+  untrusted input, so triage and resolution get only ServiceNow read tools
+  (`SERVICENOW_READ_ONLY=true` plus a `tool_filter`) and Perplexity search.
+  ElevenLabs is attached to the narrator alone, limited to `text_to_speech`.
+  The agent proposes resolutions; it cannot create incidents, add work notes
+  or change CIs.
+- **The eval does not measure the agent.** `eval/braintrust_eval.py` calls
+  Gemini directly with a hand-written prompt; it never runs `root_agent`, the
+  critic loop or the MCP tools. Its five incidents are the same ones
+  `scripts/seed_servicenow.py` seeds, and v2 only adds stored experiences to
+  the prompt, so the v1/v2 before/after numbers are not evidence that the
+  agent improves.
 
 ## License
 

@@ -15,6 +15,32 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 )
 from mcp import StdioServerParameters
 
+# ── Pinned server versions ───────────────────────────────────
+# uvx/npx fetch these at launch, so an unpinned name runs whatever was
+# published last. Bump deliberately.
+ELEVENLABS_MCP = "elevenlabs-mcp==0.12.2"
+SERVICENOW_MCP_SOURCE = (  # v0.9.1
+    "git+https://github.com/jschuller/mcp-server-servicenow.git"
+    "@912a6e712113580586a762858f6926585cbeb6ed"
+)
+PERPLEXITY_MCP = "@jschuller/perplexity-mcp@2.1.1"
+
+# ── Tool allowlists ─────────────────────────────────────────
+# Incident text, CMDB data and web results are untrusted, so the agents that
+# read them only get read tools. Write tools stay hidden even if a prompt
+# injection asks for them.
+SERVICENOW_READ_TOOLS = [
+    "list_records",
+    "get_record",
+    "aggregate_records",
+    "list_ci",
+    "get_ci",
+    "get_ci_relationships",
+    "get_table_schema",
+]
+PERPLEXITY_TOOLS = ["perplexity_search_web"]
+ELEVENLABS_TOOLS = ["text_to_speech"]
+
 
 def _find_bin(name: str) -> str:
     """Find a binary on PATH, raising if missing."""
@@ -27,12 +53,12 @@ def _find_bin(name: str) -> str:
 # ── STDIO servers (local processes via uvx/npx) ─────────────
 
 def elevenlabs_mcp() -> McpToolset:
-    """ElevenLabs MCP — TTS, STT, voice cloning."""
+    """ElevenLabs MCP — text-to-speech only."""
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
                 command=_find_bin("uvx"),
-                args=["elevenlabs-mcp"],
+                args=[ELEVENLABS_MCP],
                 env={
                     "ELEVENLABS_API_KEY": os.environ.get("ELEVENLABS_API_KEY", ""),
                     "ELEVENLABS_MCP_OUTPUT_MODE": "both",
@@ -40,16 +66,17 @@ def elevenlabs_mcp() -> McpToolset:
             ),
             timeout=30,
         ),
+        tool_filter=ELEVENLABS_TOOLS,
     )
 
 
 def servicenow_mcp() -> McpToolset:
-    """ServiceNow MCP — jschuller/mcp-server-servicenow (18 tools)."""
+    """ServiceNow MCP — jschuller/mcp-server-servicenow, read-only."""
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command=_find_bin("mcp-servicenow"),
-                args=[],
+                command=_find_bin("uvx"),
+                args=["--from", SERVICENOW_MCP_SOURCE, "mcp-server-servicenow"],
                 env={
                     "SERVICENOW_INSTANCE_URL": os.environ.get(
                         "SERVICENOW_INSTANCE_URL", ""
@@ -57,66 +84,35 @@ def servicenow_mcp() -> McpToolset:
                     "SERVICENOW_USERNAME": os.environ.get("SERVICENOW_USERNAME", ""),
                     "SERVICENOW_PASSWORD": os.environ.get("SERVICENOW_PASSWORD", ""),
                     "SERVICENOW_AUTH_TYPE": os.environ.get("SERVICENOW_AUTH_TYPE", "basic"),
+                    # Hides the write tools and refuses non-GET requests
+                    "SERVICENOW_READ_ONLY": "true",
                 },
             ),
             timeout=30,
         ),
-    )
-
-
-def postman_mcp_local() -> McpToolset:
-    """Postman MCP (local STDIO — full 100+ tools)."""
-    return McpToolset(
-        connection_params=StdioConnectionParams(
-            server_params=StdioServerParameters(
-                command=_find_bin("npx"),
-                args=["-y", "@postman/postman-mcp-server", "--full"],
-                env={
-                    "POSTMAN_API_KEY": os.environ.get("POSTMAN_API_KEY", ""),
-                },
-            ),
-            timeout=30,
-        ),
+        tool_filter=SERVICENOW_READ_TOOLS,
     )
 
 
 def perplexity_mcp() -> McpToolset:
-    """Perplexity MCP — web search."""
+    """Perplexity MCP — web search (jschuller/perplexity-mcp)."""
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command=_find_bin("uvx"),
-                args=["perplexity-mcp"],
+                command=_find_bin("npx"),
+                args=["-y", PERPLEXITY_MCP],
                 env={
                     "PERPLEXITY_API_KEY": os.environ.get("PERPLEXITY_API_KEY", ""),
                 },
             ),
             timeout=30,
         ),
+        tool_filter=PERPLEXITY_TOOLS,
     )
 
 
 # ── SSE / Streamable HTTP servers (remote — zero install) ────
-
-def postman_mcp_remote(mode: str = "minimal") -> McpToolset:
-    """Postman MCP (remote — zero local setup).
-    mode: 'minimal', 'mcp' (full), or 'code'
-    """
-    url_map = {
-        "minimal": "https://mcp.postman.com/minimal",
-        "mcp": "https://mcp.postman.com/mcp",
-        "full": "https://mcp.postman.com/mcp",
-        "code": "https://mcp.postman.com/code",
-    }
-    return McpToolset(
-        connection_params=SseConnectionParams(
-            url=url_map.get(mode, url_map["minimal"]),
-            headers={
-                "Authorization": f"Bearer {os.environ.get('POSTMAN_API_KEY', '')}",
-            },
-        ),
-    )
-
+# Defined for experiments; agent.py attaches neither.
 
 def braintrust_mcp() -> McpToolset:
     """Braintrust MCP — query eval experiments and scores."""

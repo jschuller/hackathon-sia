@@ -94,10 +94,9 @@ async def run_agent_simple(incident: str) -> str:
     """Run a lightweight version of the agent for eval.
     Uses Gemini directly to simulate the ADK agent's output.
     """
-    import google.generativeai as genai
+    from google import genai
 
-    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
     prompt = f"""You are an IT incident resolution agent.
 Given this incident, provide a concrete, step-by-step resolution plan
@@ -107,17 +106,16 @@ Incident: {incident}
 
 Resolution:"""
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
     return response.text
 
 
 async def run_agent_with_experience(incident: str) -> str:
     """Run agent with experience memory context (simulates v2)."""
-    import google.generativeai as genai
+    from google import genai
     from self_improving_agent.tools import retrieve_experiences
 
-    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
     # Guess category from incident text
     categories = ["cpu", "memory", "disk", "network", "ssl"]
@@ -145,7 +143,7 @@ Incident: {incident}
 
 Resolution:"""
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
     return response.text
 
 

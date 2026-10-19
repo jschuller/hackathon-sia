@@ -6,13 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "google-adk>=1.25.0",
+    "google-genai>=1.64.0",
     "python-dotenv>=1.0.0",
     "mcp>=1.0.0",
     "ddtrace>=4.0.0",
     "braintrust>=0.5.0",
     "autoevals>=0.1.0",
     "streamlit>=1.35.0",
-    "mcp-servicenow @ git+https://github.com/jschuller/mcp-server-servicenow.git",
 ]
 
 [project.optional-dependencies]
@@ -20,6 +20,15 @@ dev = ["ruff", "pytest"]
 
 [dependency-groups]
 dev = ["ruff", "pytest"]
+
+[tool.uv]
+# Resolve only releases uploaded before this date (a two-week cooldown when set);
+# fixed in the project so `uv lock --no-config` reproduces uv.lock anywhere.
+exclude-newer = "2026-10-04T00:00:00Z"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py312"
