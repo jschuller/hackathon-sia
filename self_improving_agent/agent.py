@@ -33,7 +33,6 @@ _ELEVENLABS_AVAILABLE = bool(os.environ.get("ELEVENLABS_API_KEY"))
 
 # ── Configuration ────────────────────────────────────────────
 MODEL = os.environ.get("ADK_MODEL", "gemini-2.5-flash")
-QUALITY_THRESHOLD = 0.85
 
 
 # ── MCP Toolsets (loaded conditionally based on .env) ────────
@@ -77,19 +76,28 @@ def exit_loop(tool_context) -> dict:
 
 
 # ── Deterministic backstop for the loop exit ─────────────────
-_OVERALL_SCORE = re.compile(r"overall(?:\s+score)?\W*([01](?:\.\d+)?)", re.IGNORECASE)
+# The critic ends its evaluation with one fixed verdict line. Free-text scores
+# are not parsed: "overall" also appears in arithmetic ("(0.90 + 0.80 ...) / 5")
+# and prose ("Overall, 1 gap remains"), which once read as approvals.
+_VERDICT = re.compile(r"^[\s*_>#-]*VERDICT\s*:\s*[*_]*\s*(APPROVED|REVISE)\b", re.IGNORECASE | re.MULTILINE)
 
 
 def critic_approved(evaluation: str) -> bool:
-    """Whether the critic's evaluation text approves the resolution.
+    """Whether the critic's evaluation ends in a "VERDICT: APPROVED" line.
 
-    The last "overall score" in the text decides when there is one; otherwise
-    the QUALITY_ACHIEVED marker does.
+    The last verdict line decides; text without one is not an approval.
     """
-    scores = _OVERALL_SCORE.findall(evaluation)
-    if scores:
-        return float(scores[-1]) >= QUALITY_THRESHOLD
-    return "QUALITY_ACHIEVED" in evaluation
+    verdicts = _VERDICT.findall(evaluation)
+    return bool(verdicts) and verdicts[-1].upper() == "APPROVED"
+
+
+def _clear_evaluation(callback_context) -> None:
+    """Drops the previous evaluation before the critic runs.
+
+    An empty model reply leaves output_key untouched, so without this the gate
+    could act on an earlier iteration's or incident's approval.
+    """
+    callback_context.state["evaluation_result"] = ""
 
 
 class ApprovalGate(BaseAgent):
@@ -196,16 +204,19 @@ If overall score >= 0.85:
 - Call store_experience with the category, a summary of the resolution, and the score
 - Call get_improvement_stats to show the learning trajectory
 - Call exit_loop last to end the improvement loop
-- Say "QUALITY_ACHIEVED" in your response
 
 If overall score < 0.85:
 - Provide specific, actionable feedback for EACH low-scoring dimension
 - Explain exactly what would raise the score
 - Do NOT call exit_loop
 
-Output your evaluation with all dimension scores and the overall score.""",
+Output your evaluation with all dimension scores and the overall score. End with
+exactly one final line, nothing after it:
+VERDICT: APPROVED   (overall score >= 0.85)
+VERDICT: REVISE     (otherwise)""",
     tools=[store_experience, get_improvement_stats, exit_loop],
     output_key="evaluation_result",
+    before_agent_callback=_clear_evaluation,
 )
 
 
