@@ -128,6 +128,9 @@ def test_text_only_approval_after_a_refinement(models: dict[str, ScriptedLlm]) -
     [
         ("Overall score: 0.90.\nVERDICT: APPROVED", True),
         ("Scores...\n**VERDICT: APPROVED**", True),
+        ("**VERDICT**: APPROVED", True),
+        ("**VERDICT:** **APPROVED**.", True),
+        ("VERDICT: APPROVED WITH CHANGES (rollback missing)", False),
         ("Overall score: 0.70.\nVERDICT: REVISE", False),
         ("VERDICT: APPROVED (first draft)\n...after rereading...\nVERDICT: REVISE", False),
         # Text without a verdict line is never an approval, whatever it says.

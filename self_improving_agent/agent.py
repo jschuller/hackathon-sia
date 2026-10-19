@@ -79,7 +79,7 @@ def exit_loop(tool_context) -> dict:
 # The critic ends its evaluation with one fixed verdict line. Free-text scores
 # are not parsed: "overall" also appears in arithmetic ("(0.90 + 0.80 ...) / 5")
 # and prose ("Overall, 1 gap remains"), which once read as approvals.
-_VERDICT = re.compile(r"^[\s*_>#-]*VERDICT\s*:\s*[*_]*\s*(APPROVED|REVISE)\b", re.IGNORECASE | re.MULTILINE)
+_VERDICT = re.compile(r"^[\s*_>#-]*VERDICT[*_]*\s*:[\s*_]*(APPROVED|REVISE)[*_.\s]*$", re.IGNORECASE | re.MULTILINE)
 
 
 def critic_approved(evaluation: str) -> bool:
