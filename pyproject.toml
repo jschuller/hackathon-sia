@@ -22,8 +22,9 @@ dev = ["ruff", "pytest"]
 dev = ["ruff", "pytest"]
 
 [tool.uv]
-# Resolve only releases uploaded before this date (a two-week cooldown when set);
-# fixed in the project so `uv lock --no-config` reproduces uv.lock anywhere.
+# Resolve only releases uploaded before this date (a cooldown, fixed when set). Being in the project, it
+# overrides a user-level exclude-newer (uv.toml), so `uv lock --check` gives the same answer on any machine.
+# Don't add `--no-config`: it skips this [tool.uv] table too, and the check then fails.
 exclude-newer = "2026-10-04T00:00:00Z"
 
 [tool.pytest.ini_options]
