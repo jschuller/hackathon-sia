@@ -15,9 +15,6 @@ dependencies = [
     "streamlit>=1.35.0",
 ]
 
-[project.optional-dependencies]
-dev = ["ruff", "pytest"]
-
 [dependency-groups]
 dev = ["ruff", "pytest"]
 
