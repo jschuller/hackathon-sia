@@ -29,8 +29,8 @@ chmod +x bootstrap.sh && ./bootstrap.sh
 # 2. Add your API keys
 nano .env
 
-# 3. Run the agent
-uv run adk web self_improving_agent
+# 3. Run the agent (from the repo root, then pick self_improving_agent in the UI)
+uv run adk web .
 
 # 4. Run with Datadog observability
 bash scripts/run.sh
@@ -44,7 +44,7 @@ uv run python -m eval.braintrust_eval
 ```bash
 uv sync                                    # install deps
 cp .env.template .env && nano .env         # add keys
-uv run adk web self_improving_agent        # start
+uv run adk web .                           # start; pick self_improving_agent
 ```
 
 ## Sponsor Tools

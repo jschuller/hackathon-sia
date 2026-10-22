@@ -13,8 +13,8 @@ Self-Improving IT Incident Agent for Self-Improving Agents Hack NYC (Feb 21, 202
 ## Package Manager
 Uses **uv** — NOT pip, NOT conda. All commands via `uv run`.
 - Install deps: `uv sync`
-- Run agent: `uv run adk web self_improving_agent`
-- Run with DD: `uv run ddtrace-run adk web self_improving_agent`
+- Run agent: `uv run adk web .` from the repo root (ADK takes a folder of agents; pick `self_improving_agent`)
+- Run with DD: `bash scripts/run.sh` (runs `uv run ddtrace-run adk web .`)
 - Run evals: `uv run python -m eval.braintrust_eval`
 
 ## Key Files

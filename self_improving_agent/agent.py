@@ -3,8 +3,8 @@ Self-Improving IT Incident Agent
 =================================
 Google ADK + MCP + Reflexion-style self-improvement loop.
 
-Run:  uv run adk web self_improving_agent
-With DD: uv run ddtrace-run adk web self_improving_agent
+Run from the repo root:  uv run adk web .   (pick self_improving_agent in the UI)
+With DD: bash scripts/run.sh
 """
 
 import os

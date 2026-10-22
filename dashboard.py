@@ -168,8 +168,8 @@ Log files consuming 40GB. Database temp files growing.""",
 with col2:
     st.subheader("Commands")
     st.code(
-        """# Start agent (ADK web UI)
-uv run adk web self_improving_agent
+        """# Start agent (ADK web UI, from the repo root)
+uv run adk web .
 
 # Start with Datadog tracing
 bash scripts/run.sh
