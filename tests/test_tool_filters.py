@@ -78,7 +78,7 @@ def test_stdio_servers_are_pinned(wired: ModuleType) -> None:
     args = [" ".join(t._connection_params.server_params.args) for t in sets]
     assert sorted(args) == sorted([
         f"--from {mcp_servers.SERVICENOW_MCP_SOURCE} mcp-server-servicenow",
-        "-y @jschuller/perplexity-mcp@2.1.1",
+        "-y @jschuller/perplexity-mcp@3.0.0",
         "elevenlabs-mcp==0.12.2",
     ])
 

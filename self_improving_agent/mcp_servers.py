@@ -23,7 +23,7 @@ SERVICENOW_MCP_SOURCE = (  # v0.9.1
     "git+https://github.com/jschuller/mcp-server-servicenow.git"
     "@912a6e712113580586a762858f6926585cbeb6ed"
 )
-PERPLEXITY_MCP = "@jschuller/perplexity-mcp@2.1.1"
+PERPLEXITY_MCP = "@jschuller/perplexity-mcp@3.0.0"
 
 # ── Tool allowlists ─────────────────────────────────────────
 # Incident text, CMDB data and web results are untrusted, so the agents that
