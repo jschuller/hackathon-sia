@@ -65,6 +65,12 @@ uv run adk web .                           # start; pick self_improving_agent
   ElevenLabs is attached to the narrator alone, limited to `text_to_speech`.
   The agent proposes resolutions; it cannot create incidents, add work notes
   or change CIs.
+- **Experience memory is untrusted.** Stored resolutions are model output
+  derived from incident and web text. They are cleaned (control and
+  invisible characters removed), capped at 2,000 characters, and handed back
+  inside `<untrusted_past_experience>` blocks with a notice, and the agents
+  are told never to follow instructions inside them. That lowers the risk
+  of a poisoned memory; it does not remove it.
 - **The eval does not measure the agent.** `eval/braintrust_eval.py` calls
   Gemini directly with a hand-written prompt; it never runs `root_agent`, the
   critic loop or the MCP tools. Its five incidents are the same ones

@@ -113,7 +113,7 @@ Resolution:"""
 async def run_agent_with_experience(incident: str) -> str:
     """Run agent with experience memory context (simulates v2)."""
     from google import genai
-    from self_improving_agent.tools import retrieve_experiences
+    from self_improving_agent.tools import experiences_for_prompt
 
     client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
@@ -125,12 +125,9 @@ async def run_agent_with_experience(incident: str) -> str:
             category = cat
             break
 
-    past = retrieve_experiences(category)
-    experience_ctx = ""
-    if past["experiences"]:
-        experience_ctx = "\n\nPast successful resolutions:\n"
-        for exp in past["experiences"]:
-            experience_ctx += f"- [Score {exp['score']}]: {exp['resolution'][:200]}\n"
+    # Delimited and marked untrusted; each resolution capped at 200 characters.
+    past = experiences_for_prompt(category, max_chars=200)
+    experience_ctx = f"\n\nPast successful resolutions:\n{past}\n" if past else ""
 
     prompt = f"""You are a self-improving IT incident resolution agent.
 You learn from past successful resolutions.
