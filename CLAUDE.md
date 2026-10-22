@@ -8,7 +8,7 @@ Self-Improving IT Incident Agent for Self-Improving Agents Hack NYC (Feb 21, 202
 - **LLM**: Gemini 2.5 Flash via `google-adk`
 - **Pattern**: Reflexion loop — Triage → Resolve → Critic → Refine → Learn
 - **MCP Servers**: ServiceNow (read-only), Perplexity and ElevenLabs (narrator only) are attached to agents.
-  `mcp_servers.py` also defines Braintrust and Datadog MCP factories that no agent uses.
+  `mcp_servers.py` also defines a Braintrust MCP factory that no agent uses.
 
 ## Package Manager
 Uses **uv** — NOT pip, NOT conda. All commands via `uv run`.
@@ -27,7 +27,7 @@ Uses **uv** — NOT pip, NOT conda. All commands via `uv run`.
 ## Sponsor Tools (must use 3+ for judging)
 1. **ServiceNow** — incident/CMDB data via MCP
 2. **ElevenLabs** — voice narration of resolutions via MCP
-3. **Datadog** — LLM Observability traces via ddtrace (no Datadog MCP attached)
+3. **Datadog** — LLM Observability traces via ddtrace (no Datadog MCP)
 4. **Braintrust** — eval scoring before/after improvement (Python SDK; see README Known limitations)
 5. **Postman** — not integrated (no Postman MCP is wired in)
 

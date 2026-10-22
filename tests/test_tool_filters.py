@@ -81,3 +81,8 @@ def test_stdio_servers_are_pinned(wired: ModuleType) -> None:
         "-y @jschuller/perplexity-mcp@2.1.1",
         "elevenlabs-mcp==0.12.2",
     ])
+
+
+def test_no_datadog_mcp_factory() -> None:
+    # It sent the Datadog application key to a remote MCP that no agent used.
+    assert not hasattr(mcp_servers, "datadog_mcp")
