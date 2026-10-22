@@ -3,7 +3,12 @@ Custom tools for the Self-Improving Agent.
 Experience memory + improvement tracking.
 """
 
+import fcntl
 import json
+import os
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -12,20 +17,55 @@ _MEMORY_FILE = Path(__file__).parent.parent / "experience_memory.json"
 _EXPERIENCE_MEMORY: list[dict] = []
 
 
-def _load_memory():
-    """Load experience memory from disk."""
-    global _EXPERIENCE_MEMORY
+def _read_memory() -> list[dict]:
+    """Read the experience memory from disk ([] when there is none yet)."""
     if _MEMORY_FILE.exists():
-        _EXPERIENCE_MEMORY = json.loads(_MEMORY_FILE.read_text())
+        return json.loads(_MEMORY_FILE.read_text())
+    return []
 
 
-def _save_memory():
-    """Persist experience memory to disk."""
-    _MEMORY_FILE.write_text(json.dumps(_EXPERIENCE_MEMORY, indent=2))
+def _load_memory() -> None:
+    """Refresh the in-memory copy from disk."""
+    global _EXPERIENCE_MEMORY
+    _EXPERIENCE_MEMORY = _read_memory()
 
 
-# Load on import
-_load_memory()
+@contextmanager
+def _memory_lock() -> Iterator[None]:
+    """Hold an exclusive lock for a read-modify-write of the memory file.
+
+    The lock is a sibling file, so it survives the os.replace of the data file.
+    Other processes (a second adk worker, the eval) block here instead of
+    writing over each other.
+    """
+    lock_path = _MEMORY_FILE.with_name(_MEMORY_FILE.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def _write_memory(memory: list[dict]) -> None:
+    """Replace the memory file atomically: write a temp file, then os.replace.
+
+    A reader sees the old file or the new one, never a half-written one.
+    """
+    _MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=_MEMORY_FILE.parent, prefix=f".{_MEMORY_FILE.name}.", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w") as tmp:
+            json.dump(memory, tmp, indent=2)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.replace(tmp_name, _MEMORY_FILE)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
 
 
 def store_experience(category: str, resolution: str, score: float) -> dict:
@@ -41,19 +81,24 @@ def store_experience(category: str, resolution: str, score: float) -> dict:
     Returns:
         Confirmation with total stored experiences.
     """
-    entry = {
-        "id": len(_EXPERIENCE_MEMORY) + 1,
-        "timestamp": datetime.now().isoformat(),
-        "category": category.lower().strip(),
-        "resolution": resolution,
-        "score": round(score, 3),
-    }
-    _EXPERIENCE_MEMORY.append(entry)
-    _save_memory()
+    global _EXPERIENCE_MEMORY
+    with _memory_lock():
+        # Re-read under the lock: another process may have stored since our last read.
+        memory = _read_memory()
+        entry = {
+            "id": max((e.get("id", 0) for e in memory), default=0) + 1,
+            "timestamp": datetime.now().isoformat(),
+            "category": category.lower().strip(),
+            "resolution": resolution,
+            "score": round(score, 3),
+        }
+        memory.append(entry)
+        _write_memory(memory)
+    _EXPERIENCE_MEMORY = memory
     return {
         "status": "stored",
         "experience_id": entry["id"],
-        "total_experiences": len(_EXPERIENCE_MEMORY),
+        "total_experiences": len(memory),
     }
 
 
@@ -149,6 +194,7 @@ def clear_experience_memory() -> dict:
         Confirmation that memory was cleared.
     """
     global _EXPERIENCE_MEMORY
+    with _memory_lock():
+        _write_memory([])
     _EXPERIENCE_MEMORY = []
-    _save_memory()
     return {"status": "cleared", "total_experiences": 0}
