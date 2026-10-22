@@ -111,8 +111,8 @@ def perplexity_mcp() -> McpToolset:
     )
 
 
-# ── SSE / Streamable HTTP servers (remote — zero install) ────
-# Defined for experiments; agent.py attaches neither.
+# ── SSE server (remote — zero install) ───────────────────────
+# Defined for experiments; agent.py does not attach it.
 
 def braintrust_mcp() -> McpToolset:
     """Braintrust MCP — query eval experiments and scores."""
@@ -125,15 +125,3 @@ def braintrust_mcp() -> McpToolset:
         ),
     )
 
-
-def datadog_mcp() -> McpToolset:
-    """Datadog MCP — logs, metrics, traces (96 tools)."""
-    return McpToolset(
-        connection_params=SseConnectionParams(
-            url="https://mcp.datadoghq.com/sse",
-            headers={
-                "DD-API-KEY": os.environ.get("DD_API_KEY", ""),
-                "DD-APPLICATION-KEY": os.environ.get("DD_APP_KEY", ""),
-            },
-        ),
-    )

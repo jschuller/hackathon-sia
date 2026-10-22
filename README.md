@@ -29,8 +29,8 @@ chmod +x bootstrap.sh && ./bootstrap.sh
 # 2. Add your API keys
 nano .env
 
-# 3. Run the agent
-uv run adk web self_improving_agent
+# 3. Run the agent (from the repo root, then pick self_improving_agent in the UI)
+uv run adk web .
 
 # 4. Run with Datadog observability
 bash scripts/run.sh
@@ -44,7 +44,7 @@ uv run python -m eval.braintrust_eval
 ```bash
 uv sync                                    # install deps
 cp .env.template .env && nano .env         # add keys
-uv run adk web self_improving_agent        # start
+uv run adk web .                           # start; pick self_improving_agent
 ```
 
 ## Sponsor Tools
@@ -65,6 +65,17 @@ uv run adk web self_improving_agent        # start
   ElevenLabs is attached to the narrator alone, limited to `text_to_speech`.
   The agent proposes resolutions; it cannot create incidents, add work notes
   or change CIs.
+- **Experience memory is untrusted.** Stored resolutions are model output
+  derived from incident and web text. They are stored verbatim (shell
+  commands such as `2>&1` survive), except that characters which hide text
+  (Unicode Tags block, bidi controls, variation selectors) are removed; they
+  are capped at 2,000 characters, and categories are limited to
+  `[a-z0-9 _-]`. Each retrieval wraps them in `<untrusted_past_experience>`
+  blocks whose tags carry a fresh random id, and a notice says only the
+  closing tag with that id ends a block. Tag-shaped spellings of the tag
+  name (including fullwidth, entity-encoded and hyphenated ones) are
+  replaced. The agents are told never to follow instructions inside them. That lowers the risk
+  of a poisoned memory; it does not remove it.
 - **The eval does not measure the agent.** `eval/braintrust_eval.py` calls
   Gemini directly with a hand-written prompt; it never runs `root_agent`, the
   critic loop or the MCP tools. Its five incidents are the same ones

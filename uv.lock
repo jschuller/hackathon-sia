@@ -1357,12 +1357,6 @@ dependencies = [
     { name = "streamlit" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -1377,12 +1371,9 @@ requires-dist = [
     { name = "google-adk", specifier = ">=1.25.0" },
     { name = "google-genai", specifier = ">=1.64.0" },
     { name = "mcp", specifier = ">=1.0.0" },
-    { name = "pytest", marker = "extra == 'dev'" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "ruff", marker = "extra == 'dev'" },
     { name = "streamlit", specifier = ">=1.35.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
