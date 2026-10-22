@@ -66,12 +66,15 @@ uv run adk web .                           # start; pick self_improving_agent
   The agent proposes resolutions; it cannot create incidents, add work notes
   or change CIs.
 - **Experience memory is untrusted.** Stored resolutions are model output
-  derived from incident and web text. They are cleaned (NFKC-normalized,
-  entities decoded, control and invisible characters removed, every `<` and
-  `>` replaced with `‹` and `›`), capped at 2,000 characters, categories are
-  limited to `[a-z0-9 _-]`, and the text is handed back
-  inside `<untrusted_past_experience>` blocks with a notice, and the agents
-  are told never to follow instructions inside them. That lowers the risk
+  derived from incident and web text. They are stored verbatim (shell
+  commands such as `2>&1` survive), except that characters which hide text
+  (Unicode Tags block, bidi controls, variation selectors) are removed; they
+  are capped at 2,000 characters, and categories are limited to
+  `[a-z0-9 _-]`. Each retrieval wraps them in `<untrusted_past_experience>`
+  blocks whose tags carry a fresh random id, and a notice says only the
+  closing tag with that id ends a block. Tag-shaped spellings of the tag
+  name (including fullwidth, entity-encoded and hyphenated ones) are
+  replaced. The agents are told never to follow instructions inside them. That lowers the risk
   of a poisoned memory; it does not remove it.
 - **The eval does not measure the agent.** `eval/braintrust_eval.py` calls
   Gemini directly with a hand-written prompt; it never runs `root_agent`, the
