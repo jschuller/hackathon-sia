@@ -5,7 +5,7 @@ import os
 import dotenv
 import pytest
 
-# agent.py calls load_dotenv() on import; the repo's .env holds real keys.
+# The eval and seed scripts call load_dotenv(); the repo's .env holds real keys.
 dotenv.load_dotenv = lambda *args, **kwargs: False
 
 # Without these, agent.py attaches no MCP toolsets at import.
